@@ -1,6 +1,7 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
-using UnityEngine.InputSystem.Controls;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -10,6 +11,10 @@ namespace VexUnbound
     {
         private static readonly Color PlayerColor = new(0.2f, 0.46f, 0.24f);
         private static readonly Color SkinColor = new(0.95f, 0.72f, 0.55f);
+        private static readonly Color UiIron = new(0.055f, 0.065f, 0.09f, 0.96f);
+        private static readonly Color UiStone = new(0.19f, 0.23f, 0.34f, 0.96f);
+        private static readonly Color UiGold = new(0.72f, 0.51f, 0.2f, 1f);
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void RegisterSceneBootstrap()
         {
@@ -31,6 +36,7 @@ namespace VexUnbound
 
             Application.targetFrameRate = 60;
             QualitySettings.vSyncCount = 0;
+            Time.fixedDeltaTime = 1f / 60f;
 
             CreatePlatform("Start Platform", new Vector3(-4f, -1f, 0f), new Vector3(8f, 1f, 3f));
             CreatePlatform("Middle Platform", new Vector3(2f, -0.65f, 0f), new Vector3(3f, 1f, 3f));
@@ -69,6 +75,14 @@ namespace VexUnbound
             collider.center = new Vector3(0f, 0.9f, 0f);
             collider.height = 1.8f;
             collider.radius = 0.34f;
+            collider.sharedMaterial = new PhysicsMaterial("Frictionless Player")
+            {
+                staticFriction = 0f,
+                dynamicFriction = 0f,
+                frictionCombine = PhysicsMaterialCombine.Minimum,
+                bounciness = 0f,
+                bounceCombine = PhysicsMaterialCombine.Minimum
+            };
 
             Rigidbody body = player.AddComponent<Rigidbody>();
             body.mass = 1f;
@@ -76,30 +90,34 @@ namespace VexUnbound
             body.collisionDetectionMode = CollisionDetectionMode.Continuous;
             body.interpolation = RigidbodyInterpolation.Interpolate;
 
-            CreatePlayerVisual(player.transform);
-
+            Transform presentationRoot = CreatePlayerVisual(player.transform);
             player.AddComponent<PlayerController>();
+            player.AddComponent<PlayerPresentation>().Visual = presentationRoot;
             return player;
         }
 
-        private static void CreatePlayerVisual(Transform player)
+        private static Transform CreatePlayerVisual(Transform player)
         {
+            Transform presentation = new GameObject("Hero Presentation").transform;
+            presentation.SetParent(player, false);
+
             GameObject character = Resources.Load<GameObject>("Characters/CrownedMarionette");
             if (character == null)
             {
                 Debug.LogError("CrownedMarionette character asset is missing; using placeholder visuals.");
-                CreateBodyPart(player, "Body", PrimitiveType.Capsule, new Vector3(0f, 0.72f, 0f), new Vector3(0.58f, 0.58f, 0.42f), PlayerColor);
-                CreateBodyPart(player, "Head", PrimitiveType.Sphere, new Vector3(0f, 1.55f, 0f), Vector3.one * 0.5f, SkinColor);
-                CreateBodyPart(player, "Left Arm", PrimitiveType.Capsule, new Vector3(-0.42f, 0.78f, 0f), new Vector3(0.18f, 0.45f, 0.18f), SkinColor);
-                CreateBodyPart(player, "Right Arm", PrimitiveType.Capsule, new Vector3(0.42f, 0.78f, 0f), new Vector3(0.18f, 0.45f, 0.18f), SkinColor);
-                return;
+                CreateBodyPart(presentation, "Body", PrimitiveType.Capsule, new Vector3(0f, 0.72f, 0f), new Vector3(0.58f, 0.58f, 0.42f), PlayerColor);
+                CreateBodyPart(presentation, "Head", PrimitiveType.Sphere, new Vector3(0f, 1.55f, 0f), Vector3.one * 0.5f, SkinColor);
+                CreateBodyPart(presentation, "Left Arm", PrimitiveType.Capsule, new Vector3(-0.42f, 0.78f, 0f), new Vector3(0.18f, 0.45f, 0.18f), SkinColor);
+                CreateBodyPart(presentation, "Right Arm", PrimitiveType.Capsule, new Vector3(0.42f, 0.78f, 0f), new Vector3(0.18f, 0.45f, 0.18f), SkinColor);
+                return presentation;
             }
 
-            GameObject visual = Instantiate(character, player);
+            GameObject visual = Instantiate(character, presentation);
             visual.name = "Crowned Marionette Visual";
             visual.transform.localPosition = new Vector3(0f, 0.9f, 0f);
             visual.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
             visual.transform.localScale = Vector3.one * 0.95f;
+            return presentation;
         }
 
         private static void CreateBodyPart(Transform parent, string name, PrimitiveType primitive, Vector3 position, Vector3 scale, Color color)
@@ -142,7 +160,7 @@ namespace VexUnbound
 
         private static GameSession CreateInterface()
         {
-            GameObject canvasObject = new("Game UI", typeof(Canvas), typeof(CanvasScaler));
+            GameObject canvasObject = new("Game UI", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             Canvas canvas = canvasObject.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
 
@@ -150,37 +168,61 @@ namespace VexUnbound
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.matchWidthOrHeight = 1f;
+            EnsureEventSystem();
 
             GameObject controls = new("Touch Controls", typeof(RectTransform));
             controls.transform.SetParent(canvas.transform, false);
             StretchToParent(controls.GetComponent<RectTransform>());
-            CreateControl(controls.transform, "Left", "<", new Vector2(40f, 40f), new Vector2(260f, 260f));
-            CreateControl(controls.transform, "Right", ">", new Vector2(320f, 40f), new Vector2(260f, 260f));
-            CreateControl(controls.transform, "Jump", "JUMP", new Vector2(-40f, 40f), new Vector2(300f, 260f), true);
+            TouchControlVisual left = CreateControl(controls.transform, "Left", new Vector2(40f, 40f), new Vector2(240f, 240f), false, -1);
+            TouchControlVisual right = CreateControl(controls.transform, "Right", new Vector2(300f, 40f), new Vector2(240f, 240f), false, 1);
+            TouchControlVisual jump = CreateControl(controls.transform, "Jump", new Vector2(-40f, 40f), new Vector2(300f, 240f), true, 0);
 
             GameObject completion = new("Completion", typeof(RectTransform), typeof(Image));
             completion.transform.SetParent(canvas.transform, false);
             StretchToParent(completion.GetComponent<RectTransform>());
-            completion.GetComponent<Image>().color = new Color(0.03f, 0.05f, 0.08f, 0.9f);
+            completion.GetComponent<Image>().color = new Color(0.015f, 0.02f, 0.045f, 0.78f);
 
-            Text completionTitle = CreateText(completion.transform, "Level Complete", new Vector2(0f, 120f), new Vector2(900f, 180f), 88);
+            GameObject panel = new("Completion Panel", typeof(RectTransform));
+            panel.transform.SetParent(completion.transform, false);
+            ConfigureCenteredRect(panel.GetComponent<RectTransform>(), Vector2.zero, new Vector2(900f, 510f));
+            CreateUiLayer(panel.transform, "Panel Shadow", new Vector2(0f, -24f), new Vector2(900f, 500f), new Color(0f, 0f, 0f, 0.62f));
+            CreateUiLayer(panel.transform, "Iron Frame", Vector2.zero, new Vector2(900f, 500f), UiIron);
+            CreateUiLayer(panel.transform, "Stone Face", new Vector2(0f, 6f), new Vector2(856f, 454f), new Color(0.12f, 0.15f, 0.24f, 0.99f));
+            CreateUiLayer(panel.transform, "Gold Header", new Vector2(0f, 151f), new Vector2(780f, 8f), UiGold);
+
+            Text completionTitle = CreateText(panel.transform, "LEVEL COMPLETE", new Vector2(0f, 92f), new Vector2(780f, 130f), 76);
+            CreateText(panel.transform, "FORTRESS PASSAGE SECURED", new Vector2(0f, 22f), new Vector2(720f, 70f), 30, false, new Color(0.7f, 0.76f, 0.9f));
 
             GameObject buttonObject = new("Restart", typeof(RectTransform), typeof(Image), typeof(Button));
-            buttonObject.transform.SetParent(completion.transform, false);
-            RectTransform buttonRect = buttonObject.GetComponent<RectTransform>();
-            buttonRect.anchorMin = buttonRect.anchorMax = new Vector2(0.5f, 0.5f);
-            buttonRect.anchoredPosition = new Vector2(0f, -100f);
-            buttonRect.sizeDelta = new Vector2(520f, 150f);
-            buttonObject.GetComponent<Image>().color = PlayerColor;
-            CreateText(buttonObject.transform, "RESTART", Vector2.zero, Vector2.zero, 58, true);
+            buttonObject.transform.SetParent(panel.transform, false);
+            ConfigureCenteredRect(buttonObject.GetComponent<RectTransform>(), new Vector2(0f, -130f), new Vector2(470f, 130f));
+            Image buttonHitArea = buttonObject.GetComponent<Image>();
+            buttonHitArea.color = Color.clear;
+            buttonHitArea.raycastTarget = true;
+            CreateUiLayer(buttonObject.transform, "Button Shadow", new Vector2(0f, -13f), new Vector2(470f, 120f), new Color(0f, 0f, 0f, 0.68f));
+            CreateUiLayer(buttonObject.transform, "Button Frame", Vector2.zero, new Vector2(470f, 120f), UiIron);
+            Image restartFace = CreateUiLayer(buttonObject.transform, "Button Face", new Vector2(0f, 6f), new Vector2(444f, 94f), new Color(0.28f, 0.18f, 0.13f, 1f));
+            CreateUiLayer(restartFace.transform, "Button Highlight", new Vector2(0f, 38f), new Vector2(410f, 5f), UiGold);
+            CreateText(restartFace.transform, "RESTART", Vector2.zero, Vector2.zero, 48, true);
+
+            Button restartButton = buttonObject.GetComponent<Button>();
+            restartButton.targetGraphic = restartFace;
+            restartButton.transition = Selectable.Transition.None;
+            buttonObject.AddComponent<TouchControlVisual>().Configure(restartFace.rectTransform, restartFace);
 
             GameSession session = canvasObject.AddComponent<GameSession>();
-            session.Configure(controls, completion, completionTitle, buttonObject.GetComponent<Button>());
+            session.Configure(controls, completion, completionTitle, restartButton, left, right, jump);
             completion.SetActive(false);
             return session;
         }
 
-        private static void CreateControl(Transform parent, string name, string label, Vector2 position, Vector2 size, bool anchorRight = false)
+        private static TouchControlVisual CreateControl(
+            Transform parent,
+            string name,
+            Vector2 position,
+            Vector2 size,
+            bool anchorRight,
+            int chevronDirection)
         {
             GameObject control = new(name, typeof(RectTransform), typeof(Image));
             control.transform.SetParent(parent, false);
@@ -192,13 +234,38 @@ namespace VexUnbound
             rect.anchoredPosition = position;
             rect.sizeDelta = size;
 
-            Image image = control.GetComponent<Image>();
-            image.color = new Color(1f, 1f, 1f, 0.18f);
-            image.raycastTarget = false;
-            CreateText(control.transform, label, Vector2.zero, Vector2.zero, 64, true);
+            Image hitArea = control.GetComponent<Image>();
+            hitArea.color = Color.clear;
+            hitArea.raycastTarget = true;
+
+            CreateUiLayer(control.transform, "Control Shadow", new Vector2(0f, -14f), size - new Vector2(4f, 8f), new Color(0f, 0f, 0f, 0.6f));
+            CreateUiLayer(control.transform, "Iron Frame", Vector2.zero, size - new Vector2(4f, 8f), UiIron);
+            Image face = CreateUiLayer(control.transform, "Stone Face", new Vector2(0f, 7f), size - new Vector2(28f, 32f), UiStone);
+            CreateUiLayer(face.transform, "Upper Edge", new Vector2(0f, size.y * 0.5f - 35f), new Vector2(size.x - 64f, 7f), new Color(0.48f, 0.56f, 0.75f, 0.8f));
+            CreateUiLayer(face.transform, "Gold Inlay", new Vector2(0f, -size.y * 0.5f + 36f), new Vector2(size.x - 82f, 5f), UiGold);
+
+            if (chevronDirection == 0)
+            {
+                CreateText(face.transform, "JUMP", Vector2.zero, Vector2.zero, 46, true);
+            }
+            else
+            {
+                CreateChevron(face.transform, chevronDirection);
+            }
+
+            TouchControlVisual visual = control.AddComponent<TouchControlVisual>();
+            visual.Configure(face.rectTransform, face);
+            return visual;
         }
 
-        private static Text CreateText(Transform parent, string value, Vector2 position, Vector2 size, int fontSize, bool stretch = false)
+        private static Text CreateText(
+            Transform parent,
+            string value,
+            Vector2 position,
+            Vector2 size,
+            int fontSize,
+            bool stretch = false,
+            Color? color = null)
         {
             GameObject textObject = new("Label", typeof(RectTransform), typeof(Text));
             textObject.transform.SetParent(parent, false);
@@ -220,9 +287,52 @@ namespace VexUnbound
             text.fontSize = fontSize;
             text.fontStyle = FontStyle.Bold;
             text.alignment = TextAnchor.MiddleCenter;
-            text.color = Color.white;
+            text.color = color ?? new Color(0.92f, 0.94f, 1f);
             text.raycastTarget = false;
+            Shadow shadow = textObject.AddComponent<Shadow>();
+            shadow.effectColor = new Color(0f, 0f, 0f, 0.8f);
+            shadow.effectDistance = new Vector2(3f, -4f);
             return text;
+        }
+
+        private static Image CreateUiLayer(Transform parent, string name, Vector2 position, Vector2 size, Color color)
+        {
+            GameObject layer = new(name, typeof(RectTransform), typeof(Image));
+            layer.transform.SetParent(parent, false);
+            ConfigureCenteredRect(layer.GetComponent<RectTransform>(), position, size);
+            Image image = layer.GetComponent<Image>();
+            image.color = color;
+            image.raycastTarget = false;
+            return image;
+        }
+
+        private static void CreateChevron(Transform parent, int direction)
+        {
+            float topRotation = direction < 0 ? 45f : -45f;
+            float bottomRotation = -topRotation;
+            Image top = CreateUiLayer(parent, "Chevron Top", new Vector2(0f, 22f), new Vector2(18f, 76f), UiGold);
+            Image bottom = CreateUiLayer(parent, "Chevron Bottom", new Vector2(0f, -22f), new Vector2(18f, 76f), UiGold);
+            top.rectTransform.localRotation = Quaternion.Euler(0f, 0f, topRotation);
+            bottom.rectTransform.localRotation = Quaternion.Euler(0f, 0f, bottomRotation);
+        }
+
+        private static void ConfigureCenteredRect(RectTransform rect, Vector2 position, Vector2 size)
+        {
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = position;
+            rect.sizeDelta = size;
+        }
+
+        private static void EnsureEventSystem()
+        {
+            if (EventSystem.current != null)
+            {
+                return;
+            }
+
+            GameObject eventSystem = new("Event System", typeof(EventSystem), typeof(InputSystemUIInputModule));
+            eventSystem.GetComponent<InputSystemUIInputModule>().AssignDefaultActions();
         }
 
         private static void StretchToParent(RectTransform rect)
@@ -238,21 +348,40 @@ namespace VexUnbound
     public sealed class PlayerController : MonoBehaviour
     {
         private const float MoveSpeed = 6f;
-        private const float JumpImpulse = 7f;
+        private const float JumpSpeed = 8.2f;
+        private const float GroundAcceleration = 42f;
+        private const float GroundDeceleration = 52f;
+        private const float GroundTurnAcceleration = 70f;
+        private const float AirAcceleration = 16f;
+        private const float AirDeceleration = 4f;
+        private const float AirTurnAcceleration = 26f;
+        private const float RiseGravity = 18f;
+        private const float ApexGravity = 14f;
+        private const float JumpCutGravity = 36f;
+        private const float FallGravity = 26f;
+        private const float TerminalFallSpeed = 18f;
+        private const float GroundStickSpeed = 2f;
+        private const float CoyoteTime = 0.11f;
+        private const float JumpBufferTime = 0.12f;
 
-        private readonly RaycastHit[] groundHits = new RaycastHit[4];
+        private readonly RaycastHit[] groundHits = new RaycastHit[8];
         private Rigidbody body;
         private CapsuleCollider capsuleCollider;
         private float movement;
-        private bool jumpQueued;
+        private float jumpQueuedUntil = float.NegativeInfinity;
+        private float lastGroundedTime = float.NegativeInfinity;
+        private bool jumpHeld;
         private bool touchJumpHeld;
 
         public GameSession Session { private get; set; }
+        public bool Grounded { get; private set; }
 
         private void Awake()
         {
             body = GetComponent<Rigidbody>();
             capsuleCollider = GetComponent<CapsuleCollider>();
+            body.useGravity = false;
+            body.linearDamping = 0f;
         }
 
         private void Update()
@@ -268,16 +397,41 @@ namespace VexUnbound
 
         private void FixedUpdate()
         {
-            Vector3 velocity = body.linearVelocity;
-            velocity.x = movement * MoveSpeed;
-            body.linearVelocity = velocity;
-
-            if (jumpQueued && IsGrounded())
+            Grounded = IsGrounded();
+            if (Grounded)
             {
-                body.AddForce(Vector3.up * JumpImpulse, ForceMode.Impulse);
+                lastGroundedTime = Time.time;
             }
 
-            jumpQueued = false;
+            Vector3 velocity = body.linearVelocity;
+            float targetSpeed = movement * MoveSpeed;
+            float speedChange = GetHorizontalAcceleration(velocity.x);
+            velocity.x = Mathf.MoveTowards(velocity.x, targetSpeed, speedChange * Time.fixedDeltaTime);
+
+            bool jumped = false;
+            if (Time.time <= jumpQueuedUntil && Time.time - lastGroundedTime <= CoyoteTime)
+            {
+                velocity.y = JumpSpeed;
+                jumpQueuedUntil = float.NegativeInfinity;
+                lastGroundedTime = float.NegativeInfinity;
+                Grounded = false;
+                jumped = true;
+            }
+
+            if (!jumped)
+            {
+                if (Grounded && velocity.y <= 0f)
+                {
+                    velocity.y = -GroundStickSpeed;
+                }
+                else
+                {
+                    float gravity = GetGravity(velocity.y);
+                    velocity.y = Mathf.Max(velocity.y - gravity * Time.fixedDeltaTime, -TerminalFallSpeed);
+                }
+            }
+
+            body.linearVelocity = velocity;
         }
 
         public void Stop()
@@ -290,7 +444,7 @@ namespace VexUnbound
         private void ReadInput()
         {
             movement = 0f;
-            bool jumpHeld = false;
+            bool keyboardJumpHeld = false;
 
             Keyboard keyboard = Keyboard.current;
             if (keyboard != null)
@@ -305,46 +459,87 @@ namespace VexUnbound
                     movement += 1f;
                 }
 
-                jumpQueued |= keyboard.spaceKey.wasPressedThisFrame;
-            }
-
-            Touchscreen touchscreen = Touchscreen.current;
-            if (touchscreen != null)
-            {
-                foreach (TouchControl touch in touchscreen.touches)
+                if (keyboard.spaceKey.wasPressedThisFrame)
                 {
-                    if (!touch.press.isPressed)
-                    {
-                        continue;
-                    }
-
-                    Vector2 position = touch.position.ReadValue();
-                    if (position.x < Screen.width * 0.32f && position.y < Screen.height * 0.42f)
-                    {
-                        movement = position.x < Screen.width * 0.16f ? -1f : 1f;
-                    }
-                    else if (position.x > Screen.width * 0.68f && position.y < Screen.height * 0.42f)
-                    {
-                        jumpHeld = true;
-                    }
+                    QueueJump();
                 }
+
+                keyboardJumpHeld = keyboard.spaceKey.isPressed;
             }
 
-            jumpQueued |= jumpHeld && !touchJumpHeld;
-            touchJumpHeld = jumpHeld;
+            if (Session == null)
+            {
+                jumpHeld = keyboardJumpHeld;
+                return;
+            }
+
+            movement += Session.LeftPressed ? -1f : 0f;
+            movement += Session.RightPressed ? 1f : 0f;
+            movement = Mathf.Clamp(movement, -1f, 1f);
+
+            bool touchJumpIsHeld = Session.JumpPressed;
+            if (touchJumpIsHeld && !touchJumpHeld)
+            {
+                QueueJump();
+            }
+
+            touchJumpHeld = touchJumpIsHeld;
+            jumpHeld = keyboardJumpHeld || touchJumpIsHeld;
+        }
+
+        private float GetHorizontalAcceleration(float currentSpeed)
+        {
+            bool hasInput = Mathf.Abs(movement) > 0.01f;
+            bool reversing = hasInput && Mathf.Abs(currentSpeed) > 0.1f && Mathf.Sign(movement) != Mathf.Sign(currentSpeed);
+            if (Grounded)
+            {
+                return reversing ? GroundTurnAcceleration : hasInput ? GroundAcceleration : GroundDeceleration;
+            }
+
+            return reversing ? AirTurnAcceleration : hasInput ? AirAcceleration : AirDeceleration;
+        }
+
+        private float GetGravity(float verticalSpeed)
+        {
+            if (verticalSpeed <= 0f)
+            {
+                return FallGravity;
+            }
+
+            if (!jumpHeld)
+            {
+                return JumpCutGravity;
+            }
+
+            return verticalSpeed < 1.1f ? ApexGravity : RiseGravity;
+        }
+
+        private void QueueJump()
+        {
+            jumpQueuedUntil = Time.time + JumpBufferTime;
         }
 
         private bool IsGrounded()
         {
-            int hitCount = Physics.RaycastNonAlloc(
+            if (body.linearVelocity.y > 0.1f)
+            {
+                return false;
+            }
+
+            float radius = Mathf.Min(capsuleCollider.bounds.extents.x, capsuleCollider.bounds.extents.z) * 0.82f;
+            float distance = capsuleCollider.bounds.extents.y - radius + 0.08f;
+            int hitCount = Physics.SphereCastNonAlloc(
                 capsuleCollider.bounds.center,
+                radius,
                 Vector3.down,
                 groundHits,
-                capsuleCollider.bounds.extents.y + 0.15f);
+                distance,
+                Physics.AllLayers,
+                QueryTriggerInteraction.Ignore);
 
             for (int i = 0; i < hitCount; i++)
             {
-                if (groundHits[i].collider != capsuleCollider)
+                if (groundHits[i].collider != capsuleCollider && groundHits[i].normal.y >= 0.65f)
                 {
                     return true;
                 }
@@ -374,14 +569,31 @@ namespace VexUnbound
         private GameObject completion;
         private Text completionTitle;
         private Button restartButton;
+        private TouchControlVisual leftControl;
+        private TouchControlVisual rightControl;
+        private TouchControlVisual jumpControl;
         private bool completed;
 
-        public void Configure(GameObject touchControls, GameObject completionScreen, Text title, Button restart)
+        public bool LeftPressed => leftControl != null && leftControl.IsPressed;
+        public bool RightPressed => rightControl != null && rightControl.IsPressed;
+        public bool JumpPressed => jumpControl != null && jumpControl.IsPressed;
+
+        public void Configure(
+            GameObject touchControls,
+            GameObject completionScreen,
+            Text title,
+            Button restart,
+            TouchControlVisual left,
+            TouchControlVisual right,
+            TouchControlVisual jump)
         {
             controls = touchControls;
             completion = completionScreen;
             completionTitle = title;
             restartButton = restart;
+            leftControl = left;
+            rightControl = right;
+            jumpControl = jump;
             restartButton.onClick.AddListener(Restart);
         }
 
@@ -410,7 +622,7 @@ namespace VexUnbound
             completed = true;
             player.Stop();
             controls.SetActive(false);
-            completionTitle.text = title;
+            completionTitle.text = title.ToUpperInvariant();
             completion.SetActive(true);
         }
 
@@ -425,34 +637,6 @@ namespace VexUnbound
             if (keyboard != null && keyboard.rKey.wasPressedThisFrame)
             {
                 restartButton.onClick.Invoke();
-                return;
-            }
-
-            Mouse mouse = Mouse.current;
-            if (mouse != null && mouse.leftButton.wasPressedThisFrame)
-            {
-                TryRestart(mouse.position.ReadValue());
-            }
-
-            Touchscreen touchscreen = Touchscreen.current;
-            if (touchscreen != null)
-            {
-                foreach (TouchControl touch in touchscreen.touches)
-                {
-                    if (touch.press.wasPressedThisFrame)
-                    {
-                        TryRestart(touch.position.ReadValue());
-                    }
-                }
-            }
-        }
-
-        private void TryRestart(Vector2 screenPosition)
-        {
-            if (RectTransformUtility.RectangleContainsScreenPoint(
-                    restartButton.GetComponent<RectTransform>(), screenPosition))
-            {
-                restartButton.onClick.Invoke();
             }
         }
 
@@ -462,8 +646,11 @@ namespace VexUnbound
         }
     }
 
+    [DefaultExecutionOrder(100)]
     public sealed class FollowHero : MonoBehaviour
     {
+        private float horizontalVelocity;
+
         public Transform Target { private get; set; }
 
         private void LateUpdate()
@@ -474,11 +661,18 @@ namespace VexUnbound
             }
 
             Vector3 position = transform.position;
-            position.x = Target.position.x;
+            position.x = Mathf.SmoothDamp(
+                position.x,
+                Target.position.x,
+                ref horizontalVelocity,
+                0.055f,
+                Mathf.Infinity,
+                Time.deltaTime);
             transform.position = position;
         }
     }
 
+    [DefaultExecutionOrder(200)]
     public sealed class ParallaxLayer : MonoBehaviour
     {
         public Transform Target { private get; set; }
