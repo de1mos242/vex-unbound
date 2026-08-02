@@ -107,13 +107,30 @@ namespace VexUnbound
             body.collisionDetectionMode = CollisionDetectionMode.Continuous;
             body.interpolation = RigidbodyInterpolation.Interpolate;
 
-            CreateBodyPart(player.transform, "Body", PrimitiveType.Capsule, new Vector3(0f, 0.72f, 0f), new Vector3(0.58f, 0.58f, 0.42f), PlayerColor);
-            CreateBodyPart(player.transform, "Head", PrimitiveType.Sphere, new Vector3(0f, 1.55f, 0f), Vector3.one * 0.5f, SkinColor);
-            CreateBodyPart(player.transform, "Left Arm", PrimitiveType.Capsule, new Vector3(-0.42f, 0.78f, 0f), new Vector3(0.18f, 0.45f, 0.18f), SkinColor);
-            CreateBodyPart(player.transform, "Right Arm", PrimitiveType.Capsule, new Vector3(0.42f, 0.78f, 0f), new Vector3(0.18f, 0.45f, 0.18f), SkinColor);
+            CreatePlayerVisual(player.transform);
 
             player.AddComponent<PlayerController>();
             return player;
+        }
+
+        private static void CreatePlayerVisual(Transform player)
+        {
+            GameObject character = Resources.Load<GameObject>("Characters/CrownedMarionette");
+            if (character == null)
+            {
+                Debug.LogError("CrownedMarionette character asset is missing; using placeholder visuals.");
+                CreateBodyPart(player, "Body", PrimitiveType.Capsule, new Vector3(0f, 0.72f, 0f), new Vector3(0.58f, 0.58f, 0.42f), PlayerColor);
+                CreateBodyPart(player, "Head", PrimitiveType.Sphere, new Vector3(0f, 1.55f, 0f), Vector3.one * 0.5f, SkinColor);
+                CreateBodyPart(player, "Left Arm", PrimitiveType.Capsule, new Vector3(-0.42f, 0.78f, 0f), new Vector3(0.18f, 0.45f, 0.18f), SkinColor);
+                CreateBodyPart(player, "Right Arm", PrimitiveType.Capsule, new Vector3(0.42f, 0.78f, 0f), new Vector3(0.18f, 0.45f, 0.18f), SkinColor);
+                return;
+            }
+
+            GameObject visual = Instantiate(character, player);
+            visual.name = "Crowned Marionette Visual";
+            visual.transform.localPosition = new Vector3(0f, 0.9f, 0f);
+            visual.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+            visual.transform.localScale = Vector3.one * 0.95f;
         }
 
         private static void CreateBodyPart(Transform parent, string name, PrimitiveType primitive, Vector3 position, Vector3 scale, Color color)

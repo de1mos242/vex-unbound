@@ -26,3 +26,7 @@
 .DS_Store
 .idea/
 .vscode/
+
+# Keep the high-resolution source model local; commit the optimized game asset.
+/Meshy_AI_Infernal_Ironclad_0802073826_texture.glb
+/Meshy_AI_The_Crowned_Marionett_0802084039_texture.glb
