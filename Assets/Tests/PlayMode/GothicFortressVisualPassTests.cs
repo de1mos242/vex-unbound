@@ -91,6 +91,76 @@ namespace VexUnbound.Tests
         }
 
         [Test]
+        public void MotionAndUiUseSmoothDimensionalPresentation()
+        {
+            GameObject hero = GameObject.Find("Hero");
+            Assert.That(hero.GetComponent("PlayerPresentation"), Is.Not.Null);
+            Assert.That(hero.GetComponent<Rigidbody>().interpolation, Is.EqualTo(RigidbodyInterpolation.Interpolate));
+            Assert.That(hero.GetComponent<CapsuleCollider>().sharedMaterial.dynamicFriction, Is.Zero);
+            Assert.That(Time.fixedDeltaTime, Is.EqualTo(1f / 60f).Within(0.0001f));
+
+            GameObject gameUi = GameObject.Find("Game UI");
+            Assert.That(gameUi.GetComponent("GraphicRaycaster"), Is.Not.Null);
+            Assert.That(GameObject.Find("Event System"), Is.Not.Null);
+
+            Transform left = gameUi.transform.Find("Touch Controls/Left");
+            Assert.That(left, Is.Not.Null);
+            Assert.That(left.GetComponent("TouchControlVisual"), Is.Not.Null);
+            Assert.That(left.Find("Control Shadow"), Is.Not.Null);
+            Assert.That(left.Find("Iron Frame"), Is.Not.Null);
+            Assert.That(left.Find("Stone Face/Upper Edge"), Is.Not.Null);
+
+            Transform restart = gameUi.transform.Find("Completion/Completion Panel/Restart");
+            Assert.That(restart.Find("Button Shadow"), Is.Not.Null);
+            Assert.That(restart.Find("Button Face/Button Highlight"), Is.Not.Null);
+        }
+
+        [UnityTest]
+        public IEnumerator ReleasedJumpUsesAControlledShortArc()
+        {
+            GameObject hero = GameObject.Find("Hero");
+            Rigidbody body = hero.GetComponent<Rigidbody>();
+            Component controller = hero.GetComponent("PlayerController");
+            Assert.That(body.useGravity, Is.False);
+
+            System.Reflection.FieldInfo jumpHeld = controller.GetType().GetField(
+                "jumpHeld",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            System.Reflection.MethodInfo getGravity = controller.GetType().GetMethod(
+                "GetGravity",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            jumpHeld.SetValue(controller, true);
+            Assert.That((float)getGravity.Invoke(controller, new object[] { 4f }), Is.EqualTo(18f));
+            jumpHeld.SetValue(controller, false);
+            Assert.That((float)getGravity.Invoke(controller, new object[] { 4f }), Is.EqualTo(36f));
+
+            yield return new WaitForFixedUpdate();
+            yield return new WaitForFixedUpdate();
+            float startHeight = body.position.y;
+            controller.GetType()
+                .GetMethod("QueueJump", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                .Invoke(controller, null);
+
+            yield return new WaitForFixedUpdate();
+            Assert.That(body.linearVelocity.y, Is.GreaterThan(7.5f));
+
+            float peakHeight = body.position.y;
+            for (int i = 0; i < 36 && body.linearVelocity.y > 0f; i++)
+            {
+                yield return new WaitForFixedUpdate();
+                peakHeight = Mathf.Max(peakHeight, body.position.y);
+            }
+
+            Assert.That(peakHeight - startHeight, Is.InRange(0.6f, 1.5f));
+            for (int i = 0; i < 8; i++)
+            {
+                yield return new WaitForFixedUpdate();
+            }
+
+            Assert.That(body.linearVelocity.y, Is.LessThan(-2f));
+        }
+
+        [Test]
         public void LightingAtmosphereAndFinishRemainBounded()
         {
             Light[] lights = Object.FindObjectsByType<Light>(FindObjectsSortMode.None);
