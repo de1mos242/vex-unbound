@@ -10,7 +10,7 @@ A 2.5D action platformer for Android built with Unity 6.5 and the Universal Rend
 
 ## Continuous Integration
 
-The **Build Android APK** GitHub Actions workflow builds a development APK on every push to `main`. It can also be started from the repository's **Actions** tab with **Run workflow**.
+The **Build Android APK** GitHub Actions workflow builds a development APK on every push to `master`. It can also be started from the repository's **Actions** tab with **Run workflow**.
 
 Configure these repository Actions secrets before running the workflow with a Unity Personal license:
 
