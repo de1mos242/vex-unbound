@@ -8,7 +8,7 @@ The world and characters are rendered in 3D, while gameplay movement is restrict
 
 ## Core Decisions
 
-- **Engine:** Unity 6.3 LTS
+- **Engine:** Unity 6.5
 - **Language:** C#
 - **Rendering:** Universal Render Pipeline (URP)
 - **Platform:** Android
@@ -85,7 +85,7 @@ The first game will not include:
 
 | Area | Technology |
 |---|---|
-| Engine | Unity 6.3 LTS |
+| Engine | Unity 6.5 |
 | Language | C# |
 | Rendering | URP |
 | Player movement | Custom motor using `CharacterController` |
