@@ -10,9 +10,6 @@ namespace VexUnbound
     {
         private static readonly Color PlayerColor = new(0.2f, 0.46f, 0.24f);
         private static readonly Color SkinColor = new(0.95f, 0.72f, 0.55f);
-        private static readonly Color PlatformColor = new(0.34f, 0.2f, 0.1f);
-        private static readonly Color FinishColor = new(0.9f, 0.58f, 0.12f);
-
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void RegisterSceneBootstrap()
         {
@@ -37,12 +34,15 @@ namespace VexUnbound
 
             CreatePlatform("Start Platform", new Vector3(-4f, -1f, 0f), new Vector3(8f, 1f, 3f));
             CreatePlatform("Middle Platform", new Vector3(2f, -0.65f, 0f), new Vector3(3f, 1f, 3f));
-            CreatePlatform("Finish Platform", new Vector3(7f, -1f, 0f), new Vector3(6f, 1f, 3f));
+            CreatePlatform("Lower Rampart", new Vector3(7f, -1f, 0f), new Vector3(6f, 1f, 3f));
+            CreatePlatform("Tower Approach", new Vector3(12.25f, -0.45f, 0f), new Vector3(3.5f, 1f, 3f));
+            CreatePlatform("Broken Causeway", new Vector3(16.5f, -0.9f, 0f), new Vector3(4f, 1f, 3f));
+            CreatePlatform("Finish Platform", new Vector3(22f, -1f, 0f), new Vector3(6f, 1f, 3f));
 
             GameObject player = CreatePlayer();
             GameSession session = CreateInterface();
             player.GetComponent<PlayerController>().Session = session;
-            CreateFinish(new Vector3(8.5f, 0.75f, 0f), session);
+            CreateFinish(new Vector3(23.5f, 0.75f, 0f), session);
 
             Camera camera = Camera.main;
             if (camera != null)
@@ -50,45 +50,14 @@ namespace VexUnbound
                 camera.orthographic = true;
                 camera.orthographicSize = 3.5f;
                 camera.transform.position = new Vector3(player.transform.position.x, 1.6f, -10f);
-                camera.backgroundColor = new Color(0.08f, 0.12f, 0.18f);
                 camera.gameObject.AddComponent<FollowHero>().Target = player.transform;
-                CreateParallaxBackground(camera.transform);
+                GothicFortressEnvironment.ConfigureScene(camera);
             }
-        }
-
-        private static void CreateParallaxBackground(Transform camera)
-        {
-            Transform clouds = CreateParallaxLayer("Clouds", camera, 0.08f);
-            CreateBodyPart(clouds, "Cloud 1", PrimitiveType.Sphere, new Vector3(-7f, 2.5f, 6f), new Vector3(4f, 0.65f, 0.5f), new Color(0.45f, 0.54f, 0.6f));
-            CreateBodyPart(clouds, "Cloud 2", PrimitiveType.Sphere, new Vector3(5f, 2.8f, 6f), new Vector3(5f, 0.75f, 0.5f), new Color(0.4f, 0.49f, 0.56f));
-
-            Transform distantHills = CreateParallaxLayer("Distant Hills", camera, 0.16f);
-            CreateBodyPart(distantHills, "Distant Hill 1", PrimitiveType.Sphere, new Vector3(-9f, -1.5f, 5f), new Vector3(9f, 4f, 0.8f), new Color(0.2f, 0.29f, 0.31f));
-            CreateBodyPart(distantHills, "Distant Hill 2", PrimitiveType.Sphere, new Vector3(2f, -1.7f, 5f), new Vector3(10f, 3.8f, 0.8f), new Color(0.18f, 0.27f, 0.29f));
-            CreateBodyPart(distantHills, "Distant Hill 3", PrimitiveType.Sphere, new Vector3(13f, -1.4f, 5f), new Vector3(9f, 4.2f, 0.8f), new Color(0.2f, 0.29f, 0.31f));
-
-            Transform nearHills = CreateParallaxLayer("Near Hills", camera, 0.32f);
-            CreateBodyPart(nearHills, "Near Hill 1", PrimitiveType.Sphere, new Vector3(-8f, -2.4f, 3f), new Vector3(8f, 3.2f, 0.8f), new Color(0.12f, 0.2f, 0.19f));
-            CreateBodyPart(nearHills, "Near Hill 2", PrimitiveType.Sphere, new Vector3(3f, -2.2f, 3f), new Vector3(9f, 3.4f, 0.8f), new Color(0.1f, 0.18f, 0.17f));
-            CreateBodyPart(nearHills, "Near Hill 3", PrimitiveType.Sphere, new Vector3(14f, -2.5f, 3f), new Vector3(8f, 3f, 0.8f), new Color(0.12f, 0.2f, 0.19f));
-        }
-
-        private static Transform CreateParallaxLayer(string name, Transform camera, float factor)
-        {
-            GameObject layer = new(name);
-            ParallaxLayer parallax = layer.AddComponent<ParallaxLayer>();
-            parallax.Target = camera;
-            parallax.Factor = factor;
-            return layer.transform;
         }
 
         private static void CreatePlatform(string name, Vector3 position, Vector3 scale)
         {
-            GameObject platform = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            platform.name = name;
-            platform.transform.SetPositionAndRotation(position, Quaternion.identity);
-            platform.transform.localScale = scale;
-            platform.GetComponent<Renderer>().material = CreateMaterial(PlatformColor);
+            GothicFortressEnvironment.CreatePlatform(name, position, scale);
         }
 
         private static GameObject CreatePlayer()
@@ -168,9 +137,7 @@ namespace VexUnbound
             trigger.size = new Vector3(1.2f, 2.5f, 2.5f);
             finish.AddComponent<FinishGoal>().Session = session;
 
-            CreateBodyPart(finish.transform, "Left Post", PrimitiveType.Cube, new Vector3(-0.5f, 0f, 0f), new Vector3(0.16f, 2.5f, 0.16f), FinishColor);
-            CreateBodyPart(finish.transform, "Right Post", PrimitiveType.Cube, new Vector3(0.5f, 0f, 0f), new Vector3(0.16f, 2.5f, 0.16f), FinishColor);
-            CreateBodyPart(finish.transform, "Top", PrimitiveType.Cube, new Vector3(0f, 1.2f, 0f), new Vector3(1.15f, 0.16f, 0.16f), FinishColor);
+            GothicFortressEnvironment.CreateFinishVisual(finish.transform);
         }
 
         private static GameSession CreateInterface()
