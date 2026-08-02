@@ -12,3 +12,4 @@ A 2.5D action platformer for Android built with Unity 6.5 and the Universal Rend
 
 - Move with the on-screen left and right controls, the arrow keys, or `A` and `D`.
 - Jump with the on-screen **JUMP** control or the Space key.
+- Reach the gold gate to finish the level, then select **RESTART** or press `R` to play again.
