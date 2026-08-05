@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  packages: write
 
 concurrency:
   group: android-apk
@@ -50,6 +51,28 @@ jobs:
           path: Builds/Android/VexUnbound.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish APK to GitHub Packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_TAG: ${{ github.run_number }}.${{ github.run_attempt }}
+        run: |
+          package="ghcr.io/${GITHUB_REPOSITORY,,}/android-apk"
+          docker login ghcr.io --username "${{ github.actor }}" --password-stdin <<< "$GH_TOKEN"
+          cat > Dockerfile.apk <<'DOCKERFILE'
+          FROM scratch
+          COPY Builds/Android/VexUnbound.apk /VexUnbound.apk
+          LABEL org.opencontainers.image.title="Vex Unbound Android APK"
+          LABEL org.opencontainers.image.description="Development Android APK built from master."
+          DOCKERFILE
+          docker build \
+            --label "org.opencontainers.image.revision=${{ github.sha }}" \
+            --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" \
+            --tag "$package:$PACKAGE_TAG" \
+            --tag "$package:latest" \
+            --file Dockerfile.apk .
+          docker push "$package:$PACKAGE_TAG"
+          docker push "$package:latest"
 
       - name: Publish APK to GitHub Release
         env:
