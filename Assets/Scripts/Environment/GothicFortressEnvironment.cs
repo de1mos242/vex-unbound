@@ -16,8 +16,10 @@ namespace VexUnbound
         private static Material distantMaterial;
         private static Material nearMaterial;
         private static Material bannerMaterial;
+        private static Material barricadeWoodMaterial;
         private static Material warmMaterial;
         private static Material rainMaterial;
+        private static Texture2D barricadeWoodTexture;
 
         public static void CreatePlatform(string name, Vector3 position, Vector3 size)
         {
@@ -57,6 +59,15 @@ namespace VexUnbound
                 PlatformTopMaterial,
                 true);
             SetTextureTiling(edgeCourse, new Vector2(Mathf.Max(1f, size.x / 1.2f), 1f));
+        }
+
+        public static void CreateObstacle(string name, Vector3 position, Vector3 size)
+        {
+            GameObject obstacle = new(name);
+            obstacle.transform.position = position;
+            obstacle.AddComponent<BoxCollider>().size = size;
+            GameObject block = CreateCube(obstacle.transform, "Wooden Barricade", Vector3.zero, size, BarricadeWoodMaterial, true);
+            SetTextureTiling(block, new Vector2(2f, Mathf.Max(2f, size.y * 4f)));
         }
 
         public static void ConfigureScene(Camera camera)
@@ -117,10 +128,10 @@ namespace VexUnbound
         private static void CreateDistantKeep(Transform camera)
         {
             Transform layer = CreateParallaxLayer("Distant Keep", camera, 0.1f);
-            CreateCube(layer, "Distant Curtain Wall", new Vector3(8f, -1.15f, 6f), new Vector3(46f, 2.4f, 0.55f), DistantMaterial, false);
+            CreateCube(layer, "Distant Curtain Wall", new Vector3(22f, -1.15f, 6f), new Vector3(82f, 2.4f, 0.55f), DistantMaterial, false);
 
-            float[] towerX = { -11f, -5f, 1.5f, 8.5f, 15f, 22f, 29f };
-            float[] towerHeights = { 4.2f, 5.4f, 4.7f, 5.8f, 4.5f, 5.3f, 4.8f };
+            float[] towerX = { -11f, -5f, 1.5f, 8.5f, 15f, 22f, 29f, 36f, 43f, 50f, 57f };
+            float[] towerHeights = { 4.2f, 5.4f, 4.7f, 5.8f, 4.5f, 5.3f, 4.8f, 5.6f, 4.4f, 5.2f, 4.9f };
             for (int i = 0; i < towerX.Length; i++)
             {
                 float height = towerHeights[i];
@@ -140,10 +151,10 @@ namespace VexUnbound
         private static void CreateNearRamparts(Transform camera)
         {
             Transform layer = CreateParallaxLayer("Near Ramparts", camera, 0.27f);
-            CreateCube(layer, "Near Curtain Wall", new Vector3(8f, -1.85f, 3.6f), new Vector3(46f, 2.5f, 0.7f), NearMaterial, false);
-            CreateBattlements(layer, "Near Wall", 8f, -0.55f, 3.6f, 46f, NearMaterial, 1.1f);
+            CreateCube(layer, "Near Curtain Wall", new Vector3(22f, -1.85f, 3.6f), new Vector3(82f, 2.5f, 0.7f), NearMaterial, false);
+            CreateBattlements(layer, "Near Wall", 22f, -0.55f, 3.6f, 82f, NearMaterial, 1.1f);
 
-            float[] towerX = { -12f, -2.5f, 6f, 15f, 24f, 31f };
+            float[] towerX = { -12f, -2.5f, 6f, 15f, 24f, 31f, 39f, 47f, 55f };
             for (int i = 0; i < towerX.Length; i++)
             {
                 float height = 3.2f + (i % 2) * 0.75f;
@@ -212,7 +223,7 @@ namespace VexUnbound
         private static void CreateRain()
         {
             GameObject rainObject = new("Light Rain");
-            rainObject.transform.position = new Vector3(8f, 5f, -1f);
+            rainObject.transform.position = new Vector3(22f, 5f, -1f);
             ParticleSystem rain = rainObject.AddComponent<ParticleSystem>();
 
             ParticleSystem.MainModule main = rain.main;
@@ -230,7 +241,7 @@ namespace VexUnbound
 
             ParticleSystem.ShapeModule shape = rain.shape;
             shape.shapeType = ParticleSystemShapeType.Box;
-            shape.scale = new Vector3(52f, 0.2f, 2f);
+            shape.scale = new Vector3(85f, 0.2f, 2f);
 
             ParticleSystem.VelocityOverLifetimeModule velocity = rain.velocityOverLifetime;
             velocity.enabled = true;
@@ -311,6 +322,42 @@ namespace VexUnbound
             return material;
         }
 
+        private static Material CreateBarricadeWoodMaterial()
+        {
+            Material material = CreateUnlitMaterial("Weathered Barricade Wood", Color.white);
+            material.SetTexture("_BaseMap", BarricadeWoodTexture);
+            return material;
+        }
+
+        private static Texture2D CreateBarricadeWoodTexture()
+        {
+            const int size = 64;
+            Texture2D texture = new(size, size, TextureFormat.RGBA32, false)
+            {
+                name = "Generated Weathered Wood",
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Repeat
+            };
+
+            Color[] pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                bool plankSeam = y % 16 < 2;
+                for (int x = 0; x < size; x++)
+                {
+                    float grain = Mathf.Sin(x * 0.42f + Mathf.Sin(y * 0.31f) * 2f) * 0.06f;
+                    float knot = Mathf.PerlinNoise(x * 0.12f, y * 0.08f) * 0.12f;
+                    pixels[y * size + x] = plankSeam
+                        ? new Color(0.12f, 0.055f, 0.025f)
+                        : new Color(0.52f + grain + knot, 0.25f + grain * 0.45f, 0.075f);
+                }
+            }
+
+            texture.SetPixels(pixels);
+            texture.Apply(false, true);
+            return texture;
+        }
+
         private static Mesh CubeMesh => cubeMesh ??= Resources.GetBuiltinResource<Mesh>("Cube.fbx");
 
         private static Mesh SpireMesh
@@ -360,6 +407,8 @@ namespace VexUnbound
         private static Material DistantMaterial => distantMaterial ??= CreateUnlitMaterial("Fogged Distant Fortress", DistantStone);
         private static Material NearMaterial => nearMaterial ??= CreateUnlitMaterial("Near Fortress Silhouette", NearStone);
         private static Material BannerMaterial => bannerMaterial ??= CreateUnlitMaterial("Faded Oxblood Banner", new Color(0.24f, 0.055f, 0.075f));
+        private static Material BarricadeWoodMaterial => barricadeWoodMaterial ??= CreateBarricadeWoodMaterial();
+        private static Texture2D BarricadeWoodTexture => barricadeWoodTexture ??= CreateBarricadeWoodTexture();
         private static Material WarmMaterial => warmMaterial ??= CreateUnlitMaterial("Lantern Glow", new Color(1f, 0.34f, 0.08f), true);
         private static Material RainMaterial => rainMaterial ??= Resources.Load<Material>("Environment/GothicFortress/Materials/Rain");
     }
