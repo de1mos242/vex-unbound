@@ -26,3 +26,11 @@ included; Unity generates mipmaps and uses ETC2 compression for Android.
 
 Fortress silhouettes, gate, lantern, railing, banner, and rubble are generated
 in Unity from simple project-owned geometry and do not contain third-party assets.
+
+## Crowned Marionette Rig
+
+- Source: Supplied by the repository owner for [issue #13](https://github.com/de1mos242/vex-unbound/issues/13)
+- License: Project-owned asset; not licensed for redistribution separately from this project
+- Imported file: `Assets/Resources/Characters/CrownedMarionette.glb`
+- Use: Skinned player character with a Mixamo-compatible skeleton
+- Animation: Locomotion keyframes are project-authored in `PlayerPresentation`; no third-party animation data is embedded in the GLB
