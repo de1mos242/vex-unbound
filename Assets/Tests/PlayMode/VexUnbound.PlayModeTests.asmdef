@@ -1,6 +1,8 @@
 {
     "name": "VexUnbound.PlayModeTests",
-    "references": [],
+    "references": [
+        "Unity.InputSystem"
+    ],
     "optionalUnityReferences": [
         "TestAssemblies"
     ],

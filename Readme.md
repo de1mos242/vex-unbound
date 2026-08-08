@@ -24,6 +24,7 @@ After a successful run, open it in the **Actions** tab and download the `VexUnbo
 
 ## Controls
 
-- Move with the on-screen left and right controls, the arrow keys, or `A` and `D`.
-- Jump with the on-screen **JUMP** control or the Space key.
+- Move with the on-screen left and right controls, the arrow keys, `A` and `D`, or a controller's left stick and D-pad.
+- Jump with the on-screen **JUMP** control, the Space key, or the controller's south face button.
+- 8BitDo controllers are supported in D-input mode.
 - Reach the gold gate to finish the level, then select **RESTART** or press `R` to play again.

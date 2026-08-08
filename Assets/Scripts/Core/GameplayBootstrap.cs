@@ -502,6 +502,8 @@ namespace VexUnbound
         {
             movement = 0f;
             bool keyboardJumpHeld = false;
+            bool controllerJumpHeld = false;
+            bool controllerJumpPressed = false;
 
             Keyboard keyboard = Keyboard.current;
             if (keyboard != null)
@@ -524,9 +526,36 @@ namespace VexUnbound
                 keyboardJumpHeld = keyboard.spaceKey.isPressed;
             }
 
+            foreach (Gamepad gamepad in Gamepad.all)
+            {
+                movement += gamepad.leftStick.x.ReadValue();
+                movement += gamepad.dpad.x.ReadValue();
+                controllerJumpPressed |= gamepad.buttonSouth.wasPressedThisFrame;
+                controllerJumpHeld |= gamepad.buttonSouth.isPressed;
+            }
+
+            foreach (Joystick joystick in Joystick.all)
+            {
+                movement += joystick.stick.x.ReadValue();
+                controllerJumpPressed |= joystick.trigger.wasPressedThisFrame;
+                controllerJumpHeld |= joystick.trigger.isPressed;
+
+                if (joystick.hatswitch != null)
+                {
+                    movement += joystick.hatswitch.x.ReadValue();
+                }
+            }
+
+            if (controllerJumpPressed)
+            {
+                QueueJump();
+            }
+
+            movement = Mathf.Clamp(movement, -1f, 1f);
+
             if (Session == null)
             {
-                jumpHeld = keyboardJumpHeld;
+                jumpHeld = keyboardJumpHeld || controllerJumpHeld;
                 return;
             }
 
@@ -541,7 +570,7 @@ namespace VexUnbound
             }
 
             touchJumpHeld = touchJumpIsHeld;
-            jumpHeld = keyboardJumpHeld || touchJumpIsHeld;
+            jumpHeld = keyboardJumpHeld || controllerJumpHeld || touchJumpIsHeld;
         }
 
         private float GetHorizontalAcceleration(float currentSpeed)
