@@ -1,6 +1,8 @@
 using System.Collections;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.LowLevel;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
@@ -304,6 +306,50 @@ namespace VexUnbound.Tests
             Assert.That((wallContact & CollisionFlags.Below) != 0, Is.False, "A side contact must not count as grounded.");
         }
 
+        [Test]
+        public void GamepadStickDpadAndSouthButtonDrivePlayerInput()
+        {
+            Gamepad gamepad = InputSystem.AddDevice<Gamepad>();
+            try
+            {
+                Component player = GameObject.Find("Hero").GetComponent("PlayerController");
+                System.Reflection.MethodInfo readInput = player.GetType().GetMethod(
+                    "ReadInput",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+                InputSystem.QueueStateEvent(gamepad, new GamepadState { leftStick = Vector2.right * 0.75f });
+                InputSystem.Update();
+                readInput.Invoke(player, null);
+                Assert.That(ReadField<float>(player, "movement"), Is.EqualTo(0.75f).Within(0.001f));
+
+                InputSystem.QueueStateEvent(gamepad, new GamepadState
+                {
+                    buttons = 1u << (int)GamepadButton.DpadLeft
+                });
+                InputSystem.Update();
+                readInput.Invoke(player, null);
+                Assert.That(ReadField<float>(player, "movement"), Is.EqualTo(-1f).Within(0.001f));
+
+                InputSystem.QueueStateEvent(gamepad, new GamepadState
+                {
+                    buttons = 1u << (int)GamepadButton.South
+                });
+                InputSystem.Update();
+                readInput.Invoke(player, null);
+                Assert.That(ReadField<float>(player, "jumpQueuedUntil"), Is.GreaterThan(Time.time));
+                Assert.That(ReadField<bool>(player, "jumpHeld"), Is.True);
+
+                InputSystem.QueueStateEvent(gamepad, new GamepadState());
+                InputSystem.Update();
+                readInput.Invoke(player, null);
+                Assert.That(ReadField<bool>(player, "jumpHeld"), Is.False);
+            }
+            finally
+            {
+                InputSystem.RemoveDevice(gamepad);
+            }
+        }
+
         [UnityTest]
         public IEnumerator CharacterControllerCanTraverseFinishTrigger()
         {
@@ -382,6 +428,13 @@ namespace VexUnbound.Tests
             controller.GetType()
                 .GetField(name, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
                 .SetValue(controller, value);
+        }
+
+        private static T ReadField<T>(Component controller, string name)
+        {
+            return (T)controller.GetType()
+                .GetField(name, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                .GetValue(controller);
         }
     }
 }
